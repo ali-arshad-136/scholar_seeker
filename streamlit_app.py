@@ -1,7 +1,17 @@
-import streamlit as st
+import os
 import re
-from openai import OpenAI
+import time
+import logging
+import requests
+import streamlit as st
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+
+# Constants
+API_URL = "https://api.perplexity.ai/chat/completions"
+DEFAULT_MODEL = "llama-3.1-sonar-large-128k-online"
 
 def extract_urls(text):
     """
@@ -209,6 +219,56 @@ def display_chat_history(messages):
                 content_with_links = extract_urls(message["content"])
                 st.markdown(content_with_links)
 
+def extract_message_content(response_data):
+    """
+    Extract the assistant's reply from the API response.
+
+    Args:
+        response_data (dict): The API response data.
+
+    Returns:
+        str: The assistant's message content.
+    """
+    try:
+        return response_data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError) as e:
+        logging.error(f"Invalid response format: {e}")
+        return None
+    
+def call_perplexity_api_with_retries(payload, headers, max_retries=3):
+    """
+    Call the Perplexity AI API with retries in case of failures.
+
+    Args:
+        payload (dict): The request payload.
+        headers (dict): The request headers.
+        max_retries (int): Maximum number of retries.
+
+    Returns:
+        dict: The API response data.
+    """
+    for attempt in range(max_retries):
+        try:
+            logging.info(f"Attempt {attempt+1}: Sending request to Perplexity AI API.")
+            response = requests.post(API_URL, json=payload, headers=headers)
+            response.raise_for_status()
+            logging.info("Request successful.")
+            return response.json()
+        except requests.exceptions.HTTPError as http_err:
+            if response.status_code == 429:  # Rate limiting
+                wait_time = 2 ** attempt
+                logging.warning(f"Rate limit exceeded. Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                logging.error(f"HTTP error occurred: {http_err}")
+                break
+        except requests.exceptions.RequestException as req_err:
+            wait_time = 2 ** attempt
+            logging.warning(f"Request error: {req_err}. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+    logging.error("Failed to get a successful response from the API.")
+    return None
+
 
 def generate_assistant_response(client, messages):
     """
@@ -285,41 +345,33 @@ def generate_assistant_response(client, messages):
         {"role": m["role"], "content": m["content"]} for m in messages
     ]
 
-    try:
-        response_stream = client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
-            messages=api_messages,
-            stream=True
-        )
+    payload = {
+        "model": DEFAULT_MODEL,
+        "messages": api_messages
+    }
 
-        full_response = ""
-        message_placeholder = st.empty()
-        citations = []  # Initialize citations list
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
 
-        for chunk in response_stream:
-            # Collect citations if available
-            if hasattr(chunk, 'citations') and chunk.citations:
-                citations.extend(chunk.citations)
-
-            # Build the full response text
-            if chunk.choices[0].delta.content is not None:
-                full_response += chunk.choices[0].delta.content
-                message_placeholder.markdown(full_response + "▌")
-
-        # After receiving the full response
-        message_placeholder.markdown(full_response)
-
-        # Replace citation markers with hyperlinks
-        content_with_links = replace_citation_markers(full_response, citations)
-        message_placeholder.markdown(content_with_links, unsafe_allow_html=True)
-
-        # Store citations in session state
-        st.session_state['last_citations'] = citations
-
-        return full_response
-
-    except Exception as e:
-        st.error(f"Research query error: {e}")
+    # Call API with retries
+    response_data = call_perplexity_api_with_retries(payload, headers)
+    if response_data:
+        # Extract assistant's reply
+        message_content = extract_message_content(response_data)
+        if message_content:
+            # Extract citations if present
+            citations = response_data.get('citations', [])
+            # Replace citation markers with hyperlinks
+            content_with_links = replace_citation_markers(message_content, citations)
+            # Store citations in session state
+            st.session_state['last_citations'] = citations
+            return content_with_links
+        else:
+            logging.error("Failed to extract message content from the response.")
+            return "Apologies, an error occurred during research retrieval."
+    else:
         return "Apologies, an error occurred during research retrieval."
 
 
@@ -344,15 +396,15 @@ def main():
     # Retrieve API key
     api_key = api_key_sidebar()
 
-    # if not api_key:
-    #     st.warning('Please enter your API key to proceed.')
-    #     return
+    if not api_key:
+        st.warning('Please enter your API key to proceed.')
+        return
 
     # Initialize OpenAI client with Perplexity API
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.perplexity.ai"
-    )
+    # client = OpenAI(
+    #     api_key=api_key,
+    #     base_url="https://api.perplexity.ai"
+    # )
 
     # Initialize chat history
     messages = initialize_chat_history()
@@ -383,7 +435,7 @@ def main():
 
             # Generate and display assistant response
             with st.chat_message("assistant", avatar='🎓'):
-                full_response = generate_assistant_response(client, messages)
+                full_response = generate_assistant_response(api_key, messages)
 
                 # Append assistant response to history
                 messages.append({"role": "assistant", "content": full_response})
