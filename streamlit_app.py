@@ -435,6 +435,8 @@ def main():
 
             # Generate and display assistant response
             with st.chat_message("assistant", avatar='🎓'):
+                api_key = st.secrets['OPENAI_API_KEY']
+
                 full_response = generate_assistant_response(api_key, messages)
 
                 # Append assistant response to history
