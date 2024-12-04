@@ -132,7 +132,7 @@ def api_key_sidebar():
         #st.image("https://your-logo-url.com/logo.png", use_container_width=True)
         st.title('🎓 Scholar Seeker')
         st.markdown("**Research Companion for Scholarly Exploration**")
-        api_key = st.secrets['PERPLEXITY_API_KEY']
+        api_key = st.secrets['OPENAI_API_KEY']
 
         # # API Key Management
         # if 'PERPLEXITY_API_KEY' in st.secrets:
