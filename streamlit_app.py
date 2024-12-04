@@ -270,7 +270,7 @@ def call_perplexity_api_with_retries(payload, headers, max_retries=3):
     return None
 
 
-def generate_assistant_response(client, messages):
+def generate_assistant_response(api_key, messages):
     """
     Generate AI-powered research response using Perplexity API.
 
