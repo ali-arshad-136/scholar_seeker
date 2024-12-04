@@ -344,9 +344,9 @@ def main():
     # Retrieve API key
     api_key = api_key_sidebar()
 
-    if not api_key:
-        st.warning('Please enter your API key to proceed.')
-        return
+    # if not api_key:
+    #     st.warning('Please enter your API key to proceed.')
+    #     return
 
     # Initialize OpenAI client with Perplexity API
     client = OpenAI(
