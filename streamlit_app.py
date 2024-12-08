@@ -181,6 +181,7 @@ def api_key_sidebar():
         )
         api_key = st.secrets['OPENAI_API_KEY']
 
+
         st.markdown("---")
         st.info("💡 Tip: Ask specific, well-defined scholarships questions for best results.")
 
