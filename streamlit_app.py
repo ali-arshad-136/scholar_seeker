@@ -1,6 +1,7 @@
 import streamlit as st
 import re
 from openai import OpenAI
+from pathlib import Path
 
 
 def extract_urls(text):
@@ -24,11 +25,13 @@ def extract_urls(text):
 
 def setup_page_config():
     """Configure Streamlit page settings with enhanced styling."""
+    icon_path = Path("icon.png")  # Replace with the actual file path
+
     # Set up the page configuration
     st.set_page_config(
         page_title="Scholar Seeker",
-        page_icon="🎓",
-        layout="wide",
+        page_icon=str(icon_path),
+        layout="centered",
         initial_sidebar_state="expanded"
     )
 
@@ -40,11 +43,6 @@ def setup_page_config():
         background-color: #f9fafb; /* Light gray for a clean background */
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    .st-emotion-cache-qdbtli {
-
-            padding: 1rem 1rem 25px;
-        
-        }
 
     /* Header styling for the main title */
     .main-header {
@@ -53,6 +51,10 @@ def setup_page_config():
         color: #1E88E5; /* Primary blue color */
         text-align: center;
         margin-bottom: 30px;
+    }
+
+    .st-bx{
+    max-height:100px;
     }
 
     /* Chat box styling */
@@ -102,7 +104,18 @@ def setup_page_config():
         padding: 10px;
         font-size: 0.9em;
     }
-    
+    .st-emotion-cache-arzcut  {
+        background-color: #f9fafb;
+      }
+    .st-emotion-cache-128upt6{
+          background-color: #f9fafb;
+
+      }
+
+    .st-emotion-cache-a4s44t{
+     background-color: #f9fafb;
+
+    }
     .loading-overlay {
         position: fixed;
         top: 0;
@@ -121,34 +134,87 @@ def setup_page_config():
     """, unsafe_allow_html=True)
 
 
+def convert_image_to_base64(image_path):
+    """
+    Convert an image to a base64 string for embedding.
+
+    Args:
+        image_path (str): Path to the image file.
+
+    Returns:
+        str: Base64 encoded string of the image.
+    """
+    import base64
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
 def api_key_sidebar():
     """
     Create sidebar for API key input with enhanced UI.
-
     Returns:
         str: Perplexity API key
     """
+    # Make sidebar a flex container with full viewport height
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] > div:first-child {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    icon_path = "icon.png"  # Replace with the actual file path
+
     with st.sidebar:
-        #st.image("https://your-logo-url.com/logo.png", use_container_width=True)
-        st.title('🎓 Scholar Seeker')
-        st.markdown("**Research Companion for Scholarly Exploration**")
-        api_key = st.secrets['API_KEY']
+        st.markdown(
+            f"""
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                <img src="data:image/png;base64,{convert_image_to_base64(icon_path)}" style="width: 100px; margin-bottom: 10px;">
+                <h3>Scholar Seeker</h3>
+                <p style="font-size: 14px;">Research Companion for Scholarly Exploration</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        api_key = st.secrets['OPENAI_API_KEY']
 
-        # # API Key Management
-        # if 'PERPLEXITY_API_KEY' in st.secrets:
-        #     st.success('API key securely loaded!', icon='✅')
-        #     api_key = st.secrets['PERPLEXITY_API_KEY']
-        # else:
-        #     api_key = st.text_input('Enter Perplexity API token:', type='password')
-        #     if api_key:
-        #         if not (api_key.startswith('pplx-')):
-        #             st.warning('Please enter a valid Perplexity API token!', icon='⚠️')
-        #         else:
-        #             st.success('API Key Validated ✓', icon='👍')
-
-        # Additional sidebar information
         st.markdown("---")
         st.info("💡 Tip: Ask specific, well-defined scholarships questions for best results.")
+
+        # Add a flexible spacer to push the button towards the bottom
+        st.markdown("<div style='flex:1;'></div>", unsafe_allow_html=True)
+
+        # Button at the bottom
+        st.markdown(
+            """
+            <div style="text-align:center; margin-top:156px;">
+                <a href="https://forms.gle/MzK9XjhgzqTSUk1f6" target="_blank" style="text-decoration:none;">
+                    <button 
+                        style="
+                            background-color:rgb(74 122 165); 
+                            color:white; 
+                            padding:10px 20px; 
+                            border:none; 
+                            border-radius:4px; 
+                            cursor:pointer; 
+                            font-size:16px; 
+                            font-weight:bold; 
+                            box-shadow:0 2px 5px rgba(0, 0, 0, 0.1);
+                            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+                        "
+                        onmouseover="this.style.backgroundColor='#1769AA';this.style.boxShadow='0 4px 10px rgba(0,0,0,0.1)';"
+                        onmouseout="this.style.backgroundColor='rgb(74 122 165)';this.style.boxShadow='0 2px 5px rgba(0,0,0,0.1)';"
+                    >
+                        💬 Share Feedback
+                    </button>
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     return api_key
 
@@ -165,7 +231,6 @@ def initialize_chat_history():
     return st.session_state.messages
 
 
-
 def replace_citation_markers(text, citations):
     """
     Replace citation markers like [1], [2] in the text with hyperlinks to the citations.
@@ -177,6 +242,7 @@ def replace_citation_markers(text, citations):
     Returns:
         str: Text with citation markers replaced by hyperlinks.
     """
+
     def replace_marker(match):
         marker = match.group(0)
         index = int(match.group(1)) - 1  # Adjust for zero-based index
@@ -193,7 +259,6 @@ def replace_citation_markers(text, citations):
     return re.sub(pattern, replace_marker, text)
 
 
-
 def display_chat_history(messages):
     """
     Display previous chat messages with user and assistant styling.
@@ -201,13 +266,23 @@ def display_chat_history(messages):
     Args:
         messages (list): List of chat messages
     """
+    # Path to the assistant avatar icon
+    assistant_avatar = "icon.png"  # Replace with the actual path to your icon file
+
     for message in messages:
-        if message["role"] != "system":
-            avatar = '🧑' if message["role"] == "user" else '🎓'
-            with st.chat_message(message["role"], avatar=avatar):
-                # Convert URLs to hyperlinks
-                content_with_links = extract_urls(message["content"])
-                st.markdown(content_with_links)
+        # Determine avatar based on the role
+        if message["role"] == "user":
+            avatar = "🧑"  # Emoji avatar for user
+        elif message["role"] == "assistant":
+            # Use assistant avatar image if it exists, fallback to emoji
+            avatar = assistant_avatar if Path(assistant_avatar).is_file() else "🎓"
+        else:
+            avatar = None  # No avatar for system messages
+
+        with st.chat_message(message["role"], avatar=avatar):
+            # Convert URLs to hyperlinks
+            content_with_links = extract_urls(message["content"])
+            st.markdown(content_with_links, unsafe_allow_html=True)
 
 
 def generate_assistant_response(client, messages):
@@ -335,9 +410,15 @@ def main():
         st.session_state.generating_response = False
 
     # Display main header
-    st.markdown('<h1 class="main-header">Scholar Seeker</h1>', unsafe_allow_html=True)
+    # Display combined header and subtext with vibrant blue header
+
     st.markdown(
-        '<div style="text-align:center; margin-top: 0px;">Welcome to Scholar Seeker, your AI-powered research assistant.</div>',
+        '''
+        <div style="text-align: center;">
+            <h1 style="color: #007BFF; margin-bottom: 5px;">Scholar Seeker</h1>
+            <p style="color: #555555; margin-top: 0px;">Bridging financial gap between ambition and education.</p>
+        </div>
+        ''',
         unsafe_allow_html=True
     )
 
@@ -374,24 +455,26 @@ def main():
             with st.chat_message("user", avatar='🧑'):
                 st.markdown(prompt)
 
-            # # Display loading overlay
-            # loading_placeholder = st.empty()
-            # loading_placeholder.markdown(
-            #     '<div class="loading-overlay">Generating response...</div>',
-            #     unsafe_allow_html=True
-            # )
+                # # Display loading overlay
+                # loading_placeholder = st.empty()
+                # loading_placeholder.markdown(
+                #     '<div class="loading-overlay">Generating response...</div>',
+                #     unsafe_allow_html=True
+                # )
 
-            # Generate and display assistant response
-            with st.chat_message("assistant", avatar='🎓'):
+                # Generate and display assistant response
+            icon_path = "icon.png"  # Replace with the correct file path
+
+            with st.chat_message("assistant", avatar=icon_path):
                 full_response = generate_assistant_response(client, messages)
 
                 # Append assistant response to history
                 messages.append({"role": "assistant", "content": full_response})
-            #
-            # # Remove loading overlay
-            # loading_placeholder.empty()
-            #
-            # # Reset the flag to allow new queries
+                #
+                # # Remove loading overlay
+                # loading_placeholder.empty()
+                #
+                # # Reset the flag to allow new queries
             st.session_state.generating_response = False
     else:
         # If a response is being generated, show a disabled chat input
